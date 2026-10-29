@@ -22,8 +22,9 @@ def generate_blog_content():
         "CONTENT: [HTML formatted body content suitable for a Blogger post]"
     )
     
+    # 모델명을 gemini-2.0-flash로 변경
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt
     )
     text = response.text
