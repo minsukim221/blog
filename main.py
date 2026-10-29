@@ -14,7 +14,7 @@ BLOG_ID = os.environ.get("BLOG_ID") # 구글 블로그 ID
 def generate_blog_content():
     """Gemini API를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성"""
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-pro")
     
     prompt = (
         "Write an engaging blog post in English about Korean culture, lifestyle, "
