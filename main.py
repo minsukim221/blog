@@ -1,20 +1,19 @@
 import os
 import requests
-import google.generativeai as genai
+from google import genai
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 
-# 환경변수에서 GitHub Secrets에 등록한 인증 정보 가져오기
+# 환경변수에서 GitHub Secrets 값 가져오기
 CLIENT_ID = os.environ.get("CLIENT_ID")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-BLOG_ID = os.environ.get("BLOG_ID") # 구글 블로그 ID
+BLOG_ID = os.environ.get("BLOG_ID")
 
 def generate_blog_content():
-    """Gemini API를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성"""
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-pro")
+    """최신 Google GenAI SDK를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성"""
+    client = genai.Client(api_key=GEMINI_API_KEY)
     
     prompt = (
         "Write an engaging blog post in English about Korean culture, lifestyle, "
@@ -23,7 +22,10 @@ def generate_blog_content():
         "CONTENT: [HTML formatted body content suitable for a Blogger post]"
     )
     
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
     text = response.text
     
     title = "K-Vibe Daily Post"
@@ -48,7 +50,6 @@ def post_to_blogger(title, content):
         token_uri="https://oauth2.googleapis.com/token"
     )
     
-    # 토큰 갱신
     creds.refresh(Request())
     
     url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
