@@ -14,16 +14,29 @@ BLOG_ID = os.environ.get("BLOG_ID") # 구글 블로그 ID
 def generate_blog_content():
     """Gemini API를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성"""
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     
     prompt = (
         "Write an engaging blog post in English about Korean culture, lifestyle, "
-        "or travel (K-Vibe). Include a catchy title and structured HTML content "
-        "suitable for a Blogger post, optimized with Google AdSense readability."
+        "or travel (K-Vibe). Provide the output strictly in the following format:\n"
+        "TITLE: [Catchy Title Here]\n"
+        "CONTENT: [HTML formatted body content suitable for a Blogger post]"
     )
     
     response = model.generate_content(prompt)
-    return response.text
+    text = response.text
+    
+    title = "K-Vibe Daily Post"
+    content = text
+    
+    if "TITLE:" in text and "CONTENT:" in text:
+        parts = text.split("CONTENT:")
+        title_part = parts[0].replace("TITLE:", "").strip()
+        if title_part:
+            title = title_part
+        content = parts[1].strip()
+        
+    return title, content
 
 def post_to_blogger(title, content):
     """Blogger API를 이용해 구글 블로그에 글 발행"""
@@ -56,6 +69,7 @@ def post_to_blogger(title, content):
 
 if __name__ == "__main__":
     print("K-Vibe 자동 포스팅 스크립트 실행 중...")
-    # 테스트를 위한 기본 제목과 내용 생성 연동
-    # (추후 Gemini API 키와 BLOG_ID를 GitHub Secrets에 추가하면 정상 동작합니다)
-    print("준비 완료!")
+    title, content = generate_blog_content()
+    print(f"생성된 제목: {title}")
+    post_to_blogger(title, content)
+    print("완료!")
