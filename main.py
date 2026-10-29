@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from google import genai
 from google.oauth2.credentials import Credentials
@@ -12,7 +13,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BLOG_ID = os.environ.get("BLOG_ID")
 
 def generate_blog_content():
-    """최신 Google GenAI SDK를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성"""
+    """최신 Google GenAI SDK를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성 (503 에러 자동 재시도 포함)"""
     client = genai.Client(api_key=GEMINI_API_KEY)
     
     prompt = (
@@ -22,13 +23,23 @@ def generate_blog_content():
         "CONTENT: [HTML formatted body content suitable for a Blogger post]"
     )
     
-    # 모델명을 gemini-3.8-flash로 변경
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt
-    )
-    text = response.text
-    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=prompt
+            )
+            text = response.text
+            break
+        except Exception as e:
+            print(f"API 호출 중 오류 발생 ({attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                print("5초 후 재시도합니다...")
+                time.sleep(5)
+            else:
+                raise e
+
     title = "K-Vibe Daily Post"
     content = text
     
