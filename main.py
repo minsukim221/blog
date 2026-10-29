@@ -13,7 +13,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BLOG_ID = os.environ.get("BLOG_ID")
 
 def generate_blog_content():
-    """최신 Google GenAI SDK를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성 (503 에러 자동 재시도 포함)"""
+    """최신 Google GenAI SDK를 이용해 K-Vibe 영어 블로그 포스팅 내용 생성 (연결 끊김 및 503 에러 자동 재시도)"""
     client = genai.Client(api_key=GEMINI_API_KEY)
     
     prompt = (
@@ -23,7 +23,7 @@ def generate_blog_content():
         "CONTENT: [HTML formatted body content suitable for a Blogger post]"
     )
     
-    max_retries = 3
+    max_retries = 5  # 재시도 횟수를 5회로 늘려 안정성 확보
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
@@ -35,8 +35,8 @@ def generate_blog_content():
         except Exception as e:
             print(f"API 호출 중 오류 발생 ({attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                print("5초 후 재시도합니다...")
-                time.sleep(5)
+                print("10초 후 재시도합니다...")
+                time.sleep(10)
             else:
                 raise e
 
