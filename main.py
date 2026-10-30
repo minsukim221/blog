@@ -20,7 +20,7 @@ BLOG_ID = os.environ.get("BLOG_ID")
 PINTEREST_ACCESS_TOKEN = os.environ.get("PINTEREST_ACCESS_TOKEN")
 PINTEREST_BOARD_ID = os.environ.get("PINTEREST_BOARD_ID")
 
-# --- 1. 참신하고 무한한 K-컬처 주제 생성 프롬프트 ---
+# --- 1. 무한 K-컬처 주제 생성 프롬프트 ---
 K_CULTURE_PROMPTS = [
     "A hidden gem travel spot or scenic viewpoint in Korea (Seoul, Busan, Gyeongju, or Jeju) for international travelers.",
     "An iconic K-Drama or K-Movie filming location that fans can actually visit in South Korea.",
@@ -32,6 +32,16 @@ K_CULTURE_PROMPTS = [
 
 selected_prompt_theme = random.choice(K_CULTURE_PROMPTS)
 print(f"[1/4] 선택된 AI 글 주제 테마: {selected_prompt_theme}")
+
+# --- 블로그 본문 및 썸네일에 들어갈 고화질 감성 이미지 풀 ---
+SAMPLE_IMAGES = [
+    "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?q=80&w=1000",
+    "https://images.unsplash.com/photo-1517154421773-0529f29ea451?q=80&w=1000",
+    "https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1000",
+    "https://images.unsplash.com/photo-1546833999-b9f581a1996d?q=80&w=1000",
+    "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1000"
+]
+selected_image_url = random.choice(SAMPLE_IMAGES)
 
 # --- 2. Gemini AI를 활용한 블로그 글 작성 ---
 try:
@@ -50,7 +60,6 @@ try:
     """
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
-    # 최신 모델명으로 변경 (gemini-3.8-flash)
     response = ai_client.models.generate_content(
         model="gemini-3.8-flash",
         contents=prompt,
@@ -61,10 +70,18 @@ try:
     # 제목 및 본문 파싱
     if "TITLE:" in raw_text and "CONTENT:" in raw_text:
         title = raw_text.split("TITLE:")[1].split("CONTENT:")[0].strip()
-        content = raw_text.split("CONTENT:")[1].strip()
+        body_content = raw_text.split("CONTENT:")[1].strip()
     else:
         title = f"Discovering Korean Culture: {selected_prompt_theme}"
-        content = f"<div>{raw_text}</div>"
+        body_content = f"<div>{raw_text}</div>"
+
+    # 본문 맨 위에 대표 이미지 태그를 자동으로 넣어 썸네일 노출 보장
+    content = f"""
+    <div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;">
+        <img src="{selected_image_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+    </div>
+    {body_content}
+    """
 
     print(f"-> 생성된 글 제목: {title}")
 
@@ -76,68 +93,3 @@ except Exception as e:
 try:
     print("[3/4] 구글 블로거 API 연결 및 게시글 등록 중...")
     creds = Credentials(
-        token=None,
-        refresh_token=REFRESH_TOKEN,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET
-    )
-    
-    blogger_service = build('blogger', 'v3', credentials=creds)
-    
-    body = {
-        'kind': 'blogger#post',
-        'title': title,
-        'content': content,
-        'labels': ['K-Vibe', 'Korea Travel', 'Korean Culture', 'SEO Optimized']
-    }
-    
-    posts = blogger_service.posts()
-    insert_request = posts.insert(blogId=BLOG_ID, body=body)
-    new_post = insert_request.execute()
-    
-    post_url = new_post.get('url')
-    print(f"✅ 구글 블로거 포스팅 완료! 게시글 URL: {post_url}")
-
-except Exception as e:
-    print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
-    sys.exit(1)
-
-# --- 4. Pinterest API 연동 (에러가 나도 스크립트가 튕기지 않도록 예외 처리) ---
-print("[4/4] 핀터레스트 핀 발행 시도 중...")
-if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
-    try:
-        pinterest_url = "https://api.pinterest.com/v5/pins"
-        headers = {
-            "Authorization": f"Bearer {PINTEREST_ACCESS_TOKEN}",
-            "Content-Type": "json"
-        }
-        
-        # 기본 스톡 대표 이미지 주소 (핀터레스트 필수값)
-        default_image = "https://images.unsplash.com/photo-1517154421773-0529f29ea451?q=80&w=1000"
-        
-        payload = {
-            "link": post_url,
-            "title": title[:100],
-            "description": f"Explore the latest K-Vibe trend: {title}",
-            "board_id": PINTEREST_BOARD_ID,
-            "media_source": {
-                "source_type": "image_url",
-                "url": default_image
-            }
-        }
-        
-        pin_res = requests.post(pinterest_url, json=payload, headers=headers)
-        
-        if pin_res.status_code == 201:
-            print("✅ 핀터레스트 핀 발행 성공!")
-        else:
-            print(f"⚠️ [Pinterest Notice] 핀 발행 대기 중 ({pin_res.status_code}): {pin_res.text}")
-            print("   (참고: 핀터레스트 Standard Access 승인 완료 전까지는 핀만 건너뛰고 블로그는 정상 발행됩니다.)")
-
-    except Exception as e:
-        print(f"⚠️ 핀터레스트 연동 중 예외 발생 (블로그 발행에는 영향 없음): {e}")
-else:
-    print("ℹ️ 핀터레스트 토큰 설정이 없어 핀터레스트 연동을 스킵합니다.")
-
-print("=== [완료] 전체 자동화 프로세스가 성공적으로 끝났습니다 ===")
