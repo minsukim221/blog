@@ -19,12 +19,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11' # Python 버전을 3.11로 업그레이드
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install google-genai google-auth-oauthlib google-auth-httplib2 google-api-python-client requests
+          pip install --upgrade google-genai google-auth-oauthlib google-auth-httplib2 google-api-python-client requests
 
       # 수동 실행(workflow_dispatch)이 아닐 때만 0~360분(최대 6시간) 랜덤 대기
       - name: Random Delay
