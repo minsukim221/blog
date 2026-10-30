@@ -49,7 +49,7 @@ def generate_seo_blog_post():
     
     print(f"Generating post for topic: {selected_topic}...")
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",  # <--- 이 부분을 gemini-3.8-flash 로 변경!
         contents=prompt,
     )
     
