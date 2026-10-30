@@ -50,8 +50,9 @@ try:
     """
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
+    # 최신 모델명으로 변경 (gemini-3.8-flash)
     response = ai_client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         contents=prompt,
     )
     
