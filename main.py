@@ -76,12 +76,7 @@ try:
         body_content = f"<div>{raw_text}</div>"
 
     # 본문 맨 위에 대표 이미지 태그를 자동으로 넣어 썸네일 노출 보장
-    content = f"""
-    <div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;">
-        <img src="{selected_image_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 8px;" />
-    </div>
-    {body_content}
-    """
+    content = f"""<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img src="{selected_image_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 8px;" /></div>{body_content}"""
 
     print(f"-> 생성된 글 제목: {title}")
 
@@ -93,3 +88,64 @@ except Exception as e:
 try:
     print("[3/4] 구글 블로거 API 연결 및 게시글 등록 중...")
     creds = Credentials(
+        token=None,
+        refresh_token=REFRESH_TOKEN,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET
+    )
+    
+    blogger_service = build('blogger', 'v3', credentials=creds)
+    
+    body = {
+        'kind': 'blogger#post',
+        'title': title,
+        'content': content,
+        'labels': ['K-Vibe', 'Korea Travel', 'Korean Culture', 'SEO Optimized']
+    }
+    
+    posts = blogger_service.posts()
+    insert_request = posts.insert(blogId=BLOG_ID, body=body)
+    new_post = insert_request.execute()
+    
+    post_url = new_post.get('url')
+    print(f"✅ 구글 블로거 포스팅 완료! 게시글 URL: {post_url}")
+
+except Exception as e:
+    print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
+    sys.exit(1)
+
+# --- 4. Pinterest API 연동 (승인 대기 중에도 오류 없이 통과) ---
+print("[4/4] 핀터레스트 핀 발행 시도 중...")
+if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
+    try:
+        pinterest_url = "https://api.pinterest.com/v5/pins"
+        headers = {
+            "Authorization": f"Bearer {PINTEREST_ACCESS_TOKEN}",
+            "Content-Type": "json"
+        }
+        
+        payload = {
+            "link": post_url,
+            "title": title[:100],
+            "description": f"Explore the latest K-Vibe trend: {title}",
+            "board_id": PINTEREST_BOARD_ID,
+            "media_source": {
+                "source_type": "image_url",
+                "url": selected_image_url
+            }
+        }
+        
+        pin_res = requests.post(pinterest_url, json=payload, headers=headers)
+        
+        if pin_res.status_code == 201:
+            print("✅ 핀터레스트 핀 발행 성공!")
+        else:
+            print(f"⚠️ [Pinterest Notice] 핀 발행 대기 중 ({pin_res.status_code}): {pin_res.text}")
+
+    except Exception as e:
+        print(f"⚠️ 핀터레스트 연동 중 예외 발생: {e}")
+else:
+    print("ℹ️ 핀터레스트 토큰 설정이 없어 핀터레스트 연동을 스킵합니다.")
+
+print("=== [완료] 전체 자동화 프로세스가 성공적으로 끝났습니다 ===")
