@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (최신 모델 + 503 재시도 로직) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (다중 모델 순차 우회 및 고도화된 재시도) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -62,36 +62,40 @@ try:
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
-    target_model = "gemini-3.8-flash"
-    max_retries = 4
-    delay = 3
+    # 플래시 모델 과부하 시 프로 모델 등으로 순차적 우회 시도
+    models_to_try = ["gemini-3.8-flash", "gemini-2.5-pro"]
     response = None
     success = False
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            print(f"  -> [시도 {attempt}/{max_retries}] 모델({target_model}) 호출 중...")
-            response = ai_client.models.generate_content(
-                model=target_model,
-                contents=prompt,
-            )
-            success = True
-            print("✅ Gemini 콘텐츠 생성 성공!")
+    for model_name in models_to_try:
+        if success:
             break
-        except Exception as api_err:
-            err_msg = str(api_err)
-            print(f"⚠️ API 요청 경고/에러 발생: {err_msg}")
-            if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg or "timeout" in err_msg.lower()) and attempt < max_retries:
-                print(f"⏳ {delay}초 대기 후 재시도합니다... ({attempt}/{max_retries})")
-                time.sleep(delay)
-                delay *= 2
-            else:
-                if attempt == max_retries:
-                    raise api_err
-                time.sleep(delay)
+        print(f"  -> 시도 중인 AI 모델: {model_name}")
+        max_retries = 3
+        delay = 5
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = ai_client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                success = True
+                print(f"✅ [{model_name}] 콘텐츠 생성 성공!")
+                break
+            except Exception as api_err:
+                err_msg = str(api_err)
+                print(f"⚠️ [{model_name}] 시도 {attempt} 실패: {err_msg[:80]}...")
+                if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
+                    print(f"⏳ {delay}초 대기 후 재시도합니다...")
+                    time.sleep(delay)
+                    delay *= 2
+                else:
+                    print(f"⚠️ [{model_name}] 모델 재시도 소진, 다음 모델로 전환합니다.")
+                    break
 
     if not success or not response:
-        raise Exception("Gemini AI 서버 응답을 받아오지 못했습니다.")
+        raise Exception("모든 Gemini 모델 서버가 과부하(503) 상태이거나 응답하지 않습니다.")
 
     raw_text = response.text
     
@@ -143,7 +147,7 @@ except Exception as e:
     print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
     sys.exit(1)
 
-# --- 4. Pinterest API 연동 (타임아웃 20초 적용으로 무한 대기 원천 차단) ---
+# --- 4. Pinterest API 연동 (타임아웃 20초 적용) ---
 print("[4/4] 핀터레스트 핀 발행 시도 중...")
 if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
     try:
