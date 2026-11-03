@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (다중 모델 자동 우회 적용) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (현재 지원되는 정식 모델 순차 우회) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -62,8 +62,8 @@ try:
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
-    # 플래시 모델 과부하 시 프로 모델로 순차적 자동 전환
-    models_to_try = ["gemini-3.8-flash", "gemini-1.5-pro", "gemini-pro"]
+    # 현재 신규 SDK 표준에서 실제로 지원하는 모델 리스트
+    models_to_try = ["gemini-2.5-flash", "gemini-2.5-pro"]
     response = None
     success = False
 
@@ -71,8 +71,8 @@ try:
         if success:
             break
         print(f"  -> 시도 중인 AI 모델: {model_name}")
-        max_retries = 3
-        delay = 3
+        max_retries = 4
+        delay = 4
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -90,11 +90,11 @@ try:
                     time.sleep(delay)
                     delay *= 2
                 else:
-                    print(f"⚠️ [{model_name}] 모델 요청 실패, 다음 모델로 전환합니다.")
+                    print(f"⚠️ [{model_name}] 모델 호출 실패 (이유: {err_msg[:60]}...), 다음 모델로 전환합니다.")
                     break
 
     if not success or not response:
-        raise Exception("모든 Gemini 모델 서버가 과부하(503) 상태이거나 응답하지 않습니다. 잠시 후 다시 시도해 주세요.")
+        raise Exception("모든 Gemini 모델 서버가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.")
 
     raw_text = response.text
     
