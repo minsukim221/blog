@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (안정적인 단일 정식 모델 + 충분한 재시도) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (gemini-3.8-flash + 503 자동 재시도) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -62,9 +62,9 @@ try:
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
-    # 구글 신규 SDK 표준 정식 모델명 지정
-    target_model = "gemini-2.5-flash"
-    max_retries = 6  # 재시도 횟수 확대 (총 6번 시도)
+    # 구글 공식 최신 표준 정식 모델명 지정
+    target_model = "gemini-3.8-flash"
+    max_retries = 6  # 총 6번 재시도
     delay = 5        # 초기 대기 시간 5초
     response = None
 
@@ -82,7 +82,7 @@ try:
             if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
                 print(f"⚠️ 서버 과부하(503) 감지. {delay}초 대기 후 재시도합니다... (사유: {err_msg[:60]}...)")
                 time.sleep(delay)
-                delay *= 2  # 5초 -> 10초 -> 20초 형태로 대기 시간 증가
+                delay *= 2  # 대기 시간 2배씩 증가 (5초 -> 10초 -> 20초...)
             else:
                 raise api_err
 
