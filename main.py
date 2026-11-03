@@ -1,6 +1,7 @@
 import os
 import sys
 import random
+import time
 from google import genai
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -43,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (503 자동 재시도 적용) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -60,11 +61,30 @@ try:
     """
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
-    response = ai_client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt,
-    )
-    
+
+    # --- [추가된 핵심 로직] 503 서버 과부하 대응 재시도 루프 ---
+    max_retries = 5
+    delay = 3
+    response = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            if attempt > 1:
+                print(f"  -> [시도 {attempt}/{max_retries}] Gemini API 다시 요청 중...")
+            response = ai_client.models.generate_content(
+                model="gemini-2.5-flash",  # 안정적인 모델로 호출
+                contents=prompt,
+            )
+            break  # 성공 시 재시도 루프 탈출
+        except Exception as api_err:
+            err_msg = str(api_err)
+            if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
+                print(f"⚠️ Gemini 서버 과부하(503) 감지. {delay}초 후 자동으로 재시도합니다... (에러 내용: {api_err})")
+                time.sleep(delay)
+                delay *= 2  # 재시도할 때마다 대기 시간을 2배로 늘림 (3초 -> 6초 -> 12초 -> 24초)
+            else:
+                raise api_err  # 503 외의 다른 에러이거나 최대 재시도 횟수를 넘기면 Exception으로 넘김
+
     raw_text = response.text
     
     # 제목 및 본문 파싱
@@ -122,7 +142,7 @@ if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
         pinterest_url = "https://api.pinterest.com/v5/pins"
         headers = {
             "Authorization": f"Bearer {PINTEREST_ACCESS_TOKEN}",
-            "Content-Type": "json"
+            "Content-Type": "application/json"
         }
         
         payload = {
