@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (503 자동 재시도 적용) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (gemini-3.8-flash + 503 자동 재시도) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -62,7 +62,7 @@ try:
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
-    # --- [추가된 핵심 로직] 503 서버 과부하 대응 재시도 루프 ---
+    # --- 503 서버 과부하 대응 재시도 루프 ---
     max_retries = 5
     delay = 3
     response = None
@@ -72,7 +72,7 @@ try:
             if attempt > 1:
                 print(f"  -> [시도 {attempt}/{max_retries}] Gemini API 다시 요청 중...")
             response = ai_client.models.generate_content(
-                model="gemini-2.5-flash",  # 안정적인 모델로 호출
+                model="gemini-3.8-flash",  # 최신 지원 모델로 수정
                 contents=prompt,
             )
             break  # 성공 시 재시도 루프 탈출
@@ -81,9 +81,9 @@ try:
             if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
                 print(f"⚠️ Gemini 서버 과부하(503) 감지. {delay}초 후 자동으로 재시도합니다... (에러 내용: {api_err})")
                 time.sleep(delay)
-                delay *= 2  # 재시도할 때마다 대기 시간을 2배로 늘림 (3초 -> 6초 -> 12초 -> 24초)
+                delay *= 2  # 재시도 대기 시간 2배 증가 (3s -> 6s -> 12s -> 24s)
             else:
-                raise api_err  # 503 외의 다른 에러이거나 최대 재시도 횟수를 넘기면 Exception으로 넘김
+                raise api_err
 
     raw_text = response.text
     
@@ -95,7 +95,7 @@ try:
         title = f"Discovering Korean Culture: {selected_prompt_theme}"
         body_content = f"<div>{raw_text}</div>"
 
-    # 본문 맨 위에 대표 이미지 태그를 자동으로 넣어 썸네일 노출 보장
+    # 본문 맨 위에 대표 이미지 태그 자동 삽입
     content = f"""<div class="separator" style="clear: both; text-align: center; margin-bottom: 20px;"><img src="{selected_image_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 8px;" /></div>{body_content}"""
 
     print(f"-> 생성된 글 제목: {title}")
@@ -135,7 +135,7 @@ except Exception as e:
     print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
     sys.exit(1)
 
-# --- 4. Pinterest API 연동 (승인 대기 중에도 오류 없이 통과) ---
+# --- 4. Pinterest API 연동 ---
 print("[4/4] 핀터레스트 핀 발행 시도 중...")
 if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
     try:
