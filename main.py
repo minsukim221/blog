@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (gemini-3.8-flash + 503 자동 재시도) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (다중 모델 자동 전환 및 고도화된 재시도) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -62,28 +62,38 @@ try:
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
-    # --- 503 서버 과부하 대응 재시도 루프 ---
-    max_retries = 5
-    delay = 3
+    # 사용할 모델 후보 리스트 (플래시 서버가 죽어있으면 다른 모델로 자동 우회)
+    models_to_try = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
     response = None
+    success = False
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            if attempt > 1:
-                print(f"  -> [시도 {attempt}/{max_retries}] Gemini API 다시 요청 중...")
-            response = ai_client.models.generate_content(
-                model="gemini-3.8-flash",  # 최신 지원 모델로 수정
-                contents=prompt,
-            )
-            break  # 성공 시 재시도 루프 탈출
-        except Exception as api_err:
-            err_msg = str(api_err)
-            if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
-                print(f"⚠️ Gemini 서버 과부하(503) 감지. {delay}초 후 자동으로 재시도합니다... (에러 내용: {api_err})")
-                time.sleep(delay)
-                delay *= 2  # 재시도 대기 시간 2배 증가 (3s -> 6s -> 12s -> 24s)
-            else:
-                raise api_err
+    for model_name in models_to_try:
+        if success:
+            break
+        print(f"  -> 시도 중인 AI 모델: {model_name}")
+        max_retries = 3
+        delay = 3
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = ai_client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                success = True
+                break
+            except Exception as api_err:
+                err_msg = str(api_err)
+                if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
+                    print(f"⚠️ [{model_name}] 서버 과부하(503) 감지. {delay}초 후 재시도... ({attempt}/{max_retries})")
+                    time.sleep(delay)
+                    delay *= 2
+                else:
+                    print(f"⚠️ [{model_name}] 모델 요청 실패, 다음 모델로 전환합니다.")
+                    break
+
+    if not success or not response:
+        raise Exception("모든 Gemini 모델 서버가 과부하(503) 상태이거나 응답하지 않습니다. 잠시 후 다시 시도해 주세요.")
 
     raw_text = response.text
     
