@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (최신 정식 모델 + 과부하 재시도) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (최신 모델 + 503 재시도 로직) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -62,9 +62,8 @@ try:
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
-    # 현재 신규 API 스펙에서 공식 지원하는 단일 표준 모델명
     target_model = "gemini-3.8-flash"
-    max_retries = 5
+    max_retries = 4
     delay = 3
     response = None
     success = False
@@ -81,13 +80,15 @@ try:
             break
         except Exception as api_err:
             err_msg = str(api_err)
-            if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries:
-                print(f"⚠️ 서버 과부하(503) 감지. {delay}초 후 재시도합니다... ({attempt}/{max_retries})")
+            print(f"⚠️ API 요청 경고/에러 발생: {err_msg}")
+            if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg or "timeout" in err_msg.lower()) and attempt < max_retries:
+                print(f"⏳ {delay}초 대기 후 재시도합니다... ({attempt}/{max_retries})")
                 time.sleep(delay)
                 delay *= 2
             else:
-                print(f"❌ API 요청 중 치명적 에러 발생: {err_msg}")
-                raise api_err
+                if attempt == max_retries:
+                    raise api_err
+                time.sleep(delay)
 
     if not success or not response:
         raise Exception("Gemini AI 서버 응답을 받아오지 못했습니다.")
@@ -142,7 +143,7 @@ except Exception as e:
     print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
     sys.exit(1)
 
-# --- 4. Pinterest API 연동 ---
+# --- 4. Pinterest API 연동 (타임아웃 20초 적용으로 무한 대기 원천 차단) ---
 print("[4/4] 핀터레스트 핀 발행 시도 중...")
 if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
     try:
@@ -163,13 +164,15 @@ if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
             }
         }
         
-        pin_res = requests.post(pinterest_url, json=payload, headers=headers)
+        pin_res = requests.post(pinterest_url, json=payload, headers=headers, timeout=20)
         
         if pin_res.status_code == 201:
             print("✅ 핀터레스트 핀 발행 성공!")
         else:
             print(f"⚠️ [Pinterest Notice] 핀 발행 대기 중 ({pin_res.status_code}): {pin_res.text}")
 
+    except requests.exceptions.Timeout:
+        print("⚠️ 핀터레스트 API 요청 시간이 초과(Timeout)되었습니다. 넘어갑니다.")
     except Exception as e:
         print(f"⚠️ 핀터레스트 연동 중 예외 발생: {e}")
 else:
