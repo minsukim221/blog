@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (쿼터 낭비 방지용 최적화) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (쿼터 낭비 없는 단일 직진 호출) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -61,35 +61,14 @@ try:
     """
 
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
-
     target_model = "gemini-3.8-flash"
-    max_retries = 3  # 하루 쿼터(20회) 보호를 위해 재시도를 3회로 제한
-    delay = 5
-    response = None
-    success = False
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            print(f"  -> [시도 {attempt}/{max_retries}] 모델({target_model}) 호출 중...")
-            response = ai_client.models.generate_content(
-                model=target_model,
-                contents=prompt,
-            )
-            success = True
-            print("✅ Gemini 콘텐츠 생성 성공!")
-            break
-        except Exception as api_err:
-            err_msg = str(api_err)
-            print(f"⚠️ 시도 {attempt} 실패: {err_msg[:90]}...")
-            if ("503" in err_msg or "UNAVAILABLE" in err_msg) and attempt < max_retries:
-                print(f"⏳ {delay}초 대기 후 재시도합니다...")
-                time.sleep(delay)
-                delay *= 2
-            else:
-                raise api_err
-
-    if not success or not response:
-        raise Exception("Gemini AI 서버 응답을 받아오지 못했습니다.")
+    # 재시도 루프를 완전히 제거하여 API 호출 횟수를 단 1회로 제한 (쿼터 보호)
+    response = ai_client.models.generate_content(
+        model=target_model,
+        contents=prompt,
+    )
+    print("✅ Gemini 콘텐츠 생성 성공!")
 
     raw_text = response.text
     
@@ -141,7 +120,7 @@ except Exception as e:
     print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
     sys.exit(1)
 
-# --- 4. Pinterest API 연동 (타임아웃 20초) ---
+# --- 4. Pinterest API 연동 ---
 print("[4/4] 핀터레스트 핀 발행 시도 중...")
 if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
     try:
