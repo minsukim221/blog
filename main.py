@@ -44,7 +44,7 @@ SAMPLE_IMAGES = [
 ]
 selected_image_url = random.choice(SAMPLE_IMAGES)
 
-# --- 2. Gemini AI를 활용한 블로그 글 작성 (강력한 재시도 루프 적용) ---
+# --- 2. Gemini AI를 활용한 블로그 글 작성 (쿼터 낭비 방지용 최적화) ---
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
     
@@ -63,8 +63,8 @@ try:
     print("[2/4] Gemini AI 콘텐츠 생성 중...")
 
     target_model = "gemini-3.8-flash"
-    max_retries = 8  # 재시도 횟수를 8번으로 대폭 강화
-    delay = 3
+    max_retries = 3  # 하루 쿼터(20회) 보호를 위해 재시도를 3회로 제한
+    delay = 5
     response = None
     success = False
 
@@ -80,13 +80,12 @@ try:
             break
         except Exception as api_err:
             err_msg = str(api_err)
-            print(f"⚠️ 시도 {attempt} 실패 사유: {err_msg[:90]}...")
-            if attempt < max_retries:
-                print(f"⏳ 서버 과부하 상태 감지. {delay}초 대기 후 다시 시도합니다...")
+            print(f"⚠️ 시도 {attempt} 실패: {err_msg[:90]}...")
+            if ("503" in err_msg or "UNAVAILABLE" in err_msg) and attempt < max_retries:
+                print(f"⏳ {delay}초 대기 후 재시도합니다...")
                 time.sleep(delay)
-                delay = min(delay * 1.5, 30)  # 대기 시간을 점진적으로 늘리되 최대 30초까지만 증가
+                delay *= 2
             else:
-                print("❌ 최대 재시도 횟수를 모두 소진했습니다.")
                 raise api_err
 
     if not success or not response:
@@ -142,7 +141,7 @@ except Exception as e:
     print(f"❌ 구글 블로거 포스팅 중 오류 발생: {e}")
     sys.exit(1)
 
-# --- 4. Pinterest API 연동 (타임아웃 20초 적용) ---
+# --- 4. Pinterest API 연동 (타임아웃 20초) ---
 print("[4/4] 핀터레스트 핀 발행 시도 중...")
 if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
     try:
@@ -171,7 +170,7 @@ if PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID:
             print(f"⚠️ [Pinterest Notice] 핀 발행 대기 중 ({pin_res.status_code}): {pin_res.text}")
 
     except requests.exceptions.Timeout:
-        print("⚠️ 핀터레스트 API 요청 시간이 초과(Timeout)되었습니다. 넘어갑니다.")
+        print("⚠️ 핀터레스트 API 요청 시간이 초과되었습니다. 넘어갑니다.")
     except Exception as e:
         print(f"⚠️ 핀터레스트 연동 중 예외 발생: {e}")
 else:
